@@ -177,19 +177,16 @@ def send_reliable(cs, filedata, receiver_binding, win_size):
         new_left_edge = transmit_one()
         message_acked = False
         while not message_acked:
-            try:
-                ack = cs.recv(CHUNK_SIZE)
+            ready = select.select([cs],[],[], RTO)
+            if ready[0]:
                 message_acked = True
-                print("ack is {}", ack)
-            except Exception as e:
-                print(e)
+                data_from_receiver, receiver_addr = cs.recvfrom(100)
+                ack_msg = Msg.deserialize(data_from_receiver)
+                print("{}".format(str(ack_msg)))
+            else:
                 new_left_edge = transmit_one()
-                
-        # wait for response
-        # if ACK
+        
         win_left_edge = new_left_edge
-        # else transmit_one()
-        # recv with timeout of RTO 
 
 if __name__ == "__main__":
     args = parse_args()
