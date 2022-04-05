@@ -159,6 +159,9 @@ def send_reliable(cs, filedata, receiver_binding, win_size):
     # reliability, and also for fresh transmissions in
     # stop-and-wait reliability.
     def transmit_one():
+        # 5 7 15 23
+        # 0 1  2  3 
+        # [ packet0, packet1, packet2, packet3 ]
         assert (win_left_edge in seq_to_msgindex)
         index = seq_to_msgindex[win_left_edge]
         msg = messages[index]
@@ -169,8 +172,24 @@ def send_reliable(cs, filedata, receiver_binding, win_size):
 
     # TODO: This is where you will make your changes. You
     # will not need to change any other parts of this file.
+    cs.settimeout(RTO)
     while win_left_edge < INIT_SEQNO + content_len:
-        win_left_edge = transmit_one()
+        new_left_edge = transmit_one()
+        message_acked = False
+        while not message_acked:
+            try:
+                ack = cs.recv(CHUNK_SIZE)
+                message_acked = True
+                print("ack is {}", ack)
+            except Exception as e:
+                print(e)
+                new_left_edge = transmit_one()
+                
+        # wait for response
+        # if ACK
+        win_left_edge = new_left_edge
+        # else transmit_one()
+        # recv with timeout of RTO 
 
 if __name__ == "__main__":
     args = parse_args()
