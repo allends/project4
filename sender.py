@@ -172,8 +172,7 @@ def send_reliable(cs, filedata, receiver_binding, win_size):
 
     # TODO: This is where you will make your changes. You
     # will not need to change any other parts of this file.
-    cs.settimeout(RTO)
-    while win_left_edge < INIT_SEQNO + content_len:
+    def stop_and_wait():
         new_left_edge = transmit_one()
         message_acked = False
         while not message_acked:
@@ -185,8 +184,37 @@ def send_reliable(cs, filedata, receiver_binding, win_size):
                 print("{}".format(str(ack_msg)))
             else:
                 new_left_edge = transmit_one()
+        return new_left_edge
+
+    cs.settimeout(RTO)
+    last_message_acked = 0
+    first_tx = INIT_SEQNO
+    while win_left_edge < INIT_SEQNO + content_len:
+        transmit_entire_window_from(first_tx)
+        # loop use select here to read all acks received within RTO
+        # retrieve the highest ACK
+        # set the win_left_edge
+        try:
+            ready = select.select([cs],[],[], RTO)
+            while ready[0]:
+                data_from_receiver, receiver_addr = cs.recvfrom(100)
+                ack_msg = Msg.deserialize(data_from_receiver)
+                if ack_msg.ack > last_message_acked:
+                    last_message_acked = ack_msg.ack
+                print("{}".format(str(ack_msg)))
+        except:
+            pass
         
-        win_left_edge = new_left_edge
+        first_tx = last_message_acked
+
+        if last_message_acked - CHUNK_SIZE != win_right_edge and last_message_acked < win_right_edge:
+            win_left_edge = last_message_acked
+            first_tx = transmit_one()
+
+        win_right_edge = min(first_tx + win_size,
+                         INIT_SEQNO + content_len)
+        win_left_edge = first_tx
+            
 
 if __name__ == "__main__":
     args = parse_args()
